@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#080e10">
+<title>AI 目标识别 · 视觉雷达</title>
+<style>
+:root{color-scheme:dark;--mint:#04ffb9;--muted:#91aeb1;--line:#1c3539;--bg:#080e10}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#13292d 0%,#080e10 60%);font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;color:#effff9;min-height:100vh}
+main{max-width:940px;margin:auto;padding:20px 12px 38px}header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}h1{font-size:21px;letter-spacing:.5px;margin:0}header small{font-size:10px;color:var(--mint);letter-spacing:2px}header .state{font-size:11px;padding:7px 10px;border:1px solid #27675a;color:#66f9c8;border-radius:20px;white-space:nowrap}
+.stage{position:relative;width:100%;aspect-ratio:16 / 9;background:#000;overflow:hidden;border:1px solid #396566;border-radius:14px;box-shadow:0 0 35px #00af8830;isolation:isolate}
+.stage video,.stage canvas#overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.stage canvas#overlay{pointer-events:none}
+.stage:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;background:repeating-linear-gradient(0deg,transparent 0 4px,#00eeaa08 5px 6px)}
+.top-hud{position:absolute;z-index:3;left:50%;top:9px;transform:translateX(-50%);border:1px solid #186c52;background:#03100de6;border-radius:18px;color:#adffe8;font-size:11px;padding:6px 13px;white-space:nowrap;letter-spacing:1px}.top-hud b{color:var(--mint);font-size:13px}
+.radar{position:absolute;z-index:3;top:42px;left:10px;width:clamp(74px,18vw,137px);aspect-ratio:1;border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 20%,#19ffa533 20.5% 21%,transparent 21.5% 39%),conic-gradient(from 0deg,#05ffb940,transparent 55deg,transparent 290deg,#09ff994b 360deg),#011c1bdb;border:1px solid #0cfbb76e;box-shadow:0 0 15px #00ff9140;overflow:hidden}
+.radar:before,.radar:after{content:"";position:absolute;background:#00ff9d42}.radar:before{width:1px;height:100%;left:50%}.radar:after{height:1px;width:100%;top:50%}.radar .sweep{position:absolute;inset:0;background:conic-gradient(from 0deg,transparent 0deg,#02ef9d25 40deg,transparent 42deg);animation:rotate 4s linear infinite;opacity:.65}@keyframes rotate{to{transform:rotate(360deg)}}.radar .dot{position:absolute;width:6px;height:6px;border:1px solid #fff;background:#ff4a57;border-radius:100%;box-shadow:0 0 7px #ff3344;transform:translate(-50%,-50%)}
+.counter{position:absolute;z-index:3;top:46px;left:50%;transform:translateX(-50%);font-weight:800;letter-spacing:1px;text-align:center;font-size:11px;background:#a81721dc;border:1px solid #ff5157;color:#fff;padding:5px 13px;white-space:nowrap}.counter span{font-size:15px;display:block}
+.corner{position:absolute;z-index:2;width:24px;height:24px;border-color:var(--mint);pointer-events:none}.tl{left:8px;bottom:38px;border-left:2px solid;border-bottom:2px solid}.tr{right:8px;bottom:38px;border-right:2px solid;border-bottom:2px solid}
+.bottom-hud{position:absolute;z-index:3;left:12px;right:12px;bottom:8px;display:flex;justify-content:space-between;color:#a5ffe0;text-shadow:0 0 8px #000;font-size:10px;letter-spacing:1px}
+.placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#759e98;text-align:center;padding:24px;font-size:13px;pointer-events:none}.placeholder strong{font-size:19px;color:#ddf9f1}.placeholder svg{opacity:.7}
+.panel{margin-top:13px;background:#101b1f;border:1px solid var(--line);padding:16px;border-radius:14px}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px}button,.upload{font:inherit;font-size:14px;appearance:none;cursor:pointer;padding:13px 10px;color:#dffcf4;background:#152e31;border:1px solid #2b5656;border-radius:10px;text-align:center;user-select:none}button:active,.upload:active{transform:scale(.99)}button.primary,.upload.primary{background:linear-gradient(120deg,#08af84,#0a746c);color:#001915;font-weight:800;border-color:#2af2b3}button:disabled{opacity:.4;cursor:default}.upload input{display:none}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.row .status{font-size:12px;color:#b3c8c5;line-height:1.5;flex:1;min-width:160px}.row button{padding:9px 12px;font-size:12px}
+.slider-row{display:flex;gap:12px;align-items:center;margin-top:15px;color:var(--muted);font-size:12px}.slider-row input{flex:1;accent-color:#0de0a0}.slider-row strong{color:#76ffcb;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:13px}.stats div{padding:12px 6px;background:#091417;border:1px solid #234345;border-radius:10px;text-align:center}.stats b{display:block;color:#82ffd5;font-size:22px;font-variant-numeric:tabular-nums}.stats small{font-size:10px;color:#8caaa7}
+.note{color:#91aaa8;line-height:1.7;font-size:12px;margin:13px 4px 0}.note b{color:#e9f9f4}
+@media(max-width:460px){main{padding:13px 9px 30px}h1{font-size:17px}.buttons{grid-template-columns:1fr 1fr}.stage{border-radius:10px}.top-hud{font-size:9px;padding:4px 8px}.counter{font-size:9px;top:35px;padding:3px 8px}.counter span{font-size:12px}.radar{top:32px}.bottom-hud{font-size:8px}.panel{padding:11px}}
+</style>
+</head>
+<body>
+<main>
+  <header><div><small>VISION LAB / OBJECT DETECTION</small><h1>AI 视觉雷达 <span style="color:#09d99c">PRO</span></h1></div><div class="state" id="state">● 准备中</div></header>
+  <section class="stage" id="stage">
+    <video id="video" playsinline webkit-playsinline muted autoplay></video>
+    <canvas id="overlay"></canvas>
+    <div class="placeholder" id="placeholder"><svg width="44" height="44" fill="none" stroke="#00dda4" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="12" r="4"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><strong>实时目标识别</strong><span>选择本地视频或开启摄像头</span></div>
+    <div class="top-hud">🟢 AI 视觉识别 <b id="countTop">0</b> 目标</div>
+    <div class="radar" id="radar"><div class="sweep"></div></div>
+    <div class="counter"><span id="countPanel">0 TARGETS</span>当前识别目标</div>
+    <span class="corner tl"></span><span class="corner tr"></span>
+    <div class="bottom-hud"><span id="sourceLabel">SOURCE: NONE</span><span>AI DETECTION · <span id="clock">--:--:--</span></span></div>
+  </section>
+  <div class="panel">
+    <div class="buttons"><label class="upload primary" for="file">📁 选择视频</label><input style="display:none" id="file" type="file" accept="video/*"><button id="camera">📷 开启后置摄像头</button><button id="pause" disabled>⏯ 暂停 / 播放</button><button id="full">⛶ 视频全屏</button></div>
+    <div class="row"><div class="status" id="status" aria-live="polite">正在准备 AI 识别模型，请保持联网…</div><button id="stop">停止检测</button></div>
+    <div class="slider-row"><span>最低置信度</span><input type="range" id="threshold" min="20" max="90" step="5" value="45"><strong id="thresholdValue">45%</strong></div>
+    <div class="stats"><div><b id="people">0</b><small>行人</small></div><div><b id="vehicles">0</b><small>车辆</small></div><div><b id="speed">0.0</b><small>识别帧 / 秒</small></div></div>
+  </div>
+  <p class="note"><b>说明：</b>本程序用真实 AI 模型识别视频中的人、汽车、自行车等常见物体。绿色框和计数来自模型结果；雷达点仅表示画面中目标的相对位置，<b>不是实际距离、方位或穿墙透视</b>。模型首次下载需联网，速度取决于手机性能。</p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const video=$('video'), canvas=$('overlay'), ctx=canvas.getContext('2d'), stage=$('stage');
+  const status=$('status'), state=$('state'), radar=$('radar');
+  const labels={person:'行人',car:'汽车',truck:'货车',bus:'巴士',motorcycle:'摩托车',bicycle:'自行车'};
+  const veh=new Set(['car','truck','bus','motorcycle','bicycle']);
+  let model=null, modelReady=false, modelPromise=null, source='none', stream=null, url=null, runId=0, timer=null, lastDetect=0, lastPreds=[];
+  let threshold=.45;
+  $('threshold').addEventListener('input', e=>{threshold=+e.target.value/100;$('thresholdValue').textContent=e.target.value+'%';});
+  $('clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  setInterval(()=>$('clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false}),1000);
+  function message(text,isError=false){status.textContent=text;status.style.color=isError?'#ff9292':'#b3c8c5';}
+  function clearBoxes(){ctx.clearRect(0,0,canvas.width,canvas.height); lastPreds=[]; updateHud([]);$('speed').textContent='0.0';}
+  function updateHud(items){$('countTop').textContent=items.length;$('countPanel').textContent=items.length+' TARGETS';$('people').textContent=items.filter(x=>x.class==='person').length;$('vehicles').textContent=items.filter(x=>veh.has(x.class)).length;radar.querySelectorAll('.dot').forEach(x=>x.remove());
+    const w=video.videoWidth||1,h=video.videoHeight||1;
+    for(const p of items){const d=document.createElement('i');d.className='dot';d.style.left=Math.max(5,Math.min(95,(p.bbox[0]+p.bbox[2]/2)/w*100))+'%';d.style.top=Math.max(5,Math.min(95,(p.bbox[1]+p.bbox[3]/2)/h*100))+'%';radar.appendChild(d);}
+  }
+  function paint(items){
+    ctx.clearRect(0,0,canvas.width,canvas.height);ctx.lineWidth=Math.max(2,Math.floor(canvas.width/390)*2);
+    items.forEach((p,i)=>{
+      let [x,y,w,h]=p.bbox;
+      if(![x,y,w,h].every(Number.isFinite))return;
+      x=Math.max(0,x);y=Math.max(0,y);w=Math.max(1,Math.min(w,canvas.width-x));h=Math.max(1,Math.min(h,canvas.height-y));
+      const a=Math.min(w*.23,h*.23,33),r=Math.max(2,canvas.width/490);
+      ctx.strokeStyle='#00ffad';ctx.lineWidth=r*2;ctx.beginPath();
+      ctx.moveTo(x,y+a);ctx.lineTo(x,y);ctx.lineTo(x+a,y);
+      ctx.moveTo(x+w-a,y);ctx.lineTo(x+w,y);ctx.lineTo(x+w,y+a);
+      ctx.moveTo(x,y+h-a);ctx.lineTo(x,y+h);ctx.lineTo(x+a,y+h);
+      ctx.moveTo(x+w-a,y+h);ctx.lineTo(x+w,y+h);ctx.lineTo(x+w,y+h-a);ctx.stroke();
+      let t=`${labels[p.class]||p.class} ${Math.round(p.score*100)}%`;
+      const fs=Math.max(12,Math.round(canvas.width/65));ctx.font=`bold ${fs}px system-ui`;const tw=ctx.measureText(t).width;
+      const ty=y>fs+10?y-fs-8:y+3;
+      ctx.fillStyle='#02291ecf';ctx.fillRect(x,ty,tw+12,fs+8);
+      ctx.fillStyle='#79ffce';ctx.fillText(t,x+6,ty+fs+1);
+      ctx.beginPath();ctx.arc(x+w/2,y+h/2,Math.max(4,canvas.width/190),0,Math.PI*2);ctx.stroke();
+    });
+  }
+  function resizeToVideo(){if(video.videoWidth&&video.videoHeight){canvas.width=video.videoWidth;canvas.height=video.videoHeight;stage.style.aspectRatio=video.videoWidth+'/'+video.videoHeight;}}
+  function stopCurrent(){runId++;if(timer){clearTimeout(timer);timer=null;}video.pause();if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}video.srcObject=null;video.removeAttribute('src');video.load();if(url){URL.revokeObjectURL(url);url=null;}source='none';$('sourceLabel').textContent='SOURCE: NONE';$('pause').disabled=true;$('placeholder').style.display='flex';clearBoxes();state.textContent='● 已停止';}
+  async function ensureModel(){if(modelReady)return;if(modelPromise)return modelPromise;message('正在加载 AI 模型，请保持联网…');if(!window.tf||!window.cocoSsd){throw new Error('AI 脚本加载失败，请检查网络或 CDN 是否可访问');}modelPromise=(async()=>{try{await tf.ready();model=await cocoSsd.load({base:'lite_mobilenet_v2'});modelReady=true;state.textContent='● AI 已就绪';message('模型就绪，选择视频或开启摄像头。');}catch(e){modelPromise=null;throw new Error('模型加载失败：'+e.message);}})();return modelPromise;}
+  function startLoop(){const id=++runId;lastDetect=0;
+    async function tick(){if(id!==runId)return;
+      if(modelReady && video.readyState>=2 && !video.paused && !video.ended){
+        try{if(canvas.width!==video.videoWidth||canvas.height!==video.videoHeight)resizeToVideo();const st=performance.now();const all=await model.detect(video,20,threshold);if(id!==runId)return;
+          const items=all.filter(p=>p.class in labels);lastPreds=items;paint(items);updateHud(items);
+          const now=performance.now();$('speed').textContent=(1000/Math.max(1,now-(lastDetect||st))).toFixed(1);lastDetect=now;
+          state.textContent='● 实时识别中';message('正在识别 '+(source==='camera'?'摄像头画面':'本地视频')+'，当前 '+items.length+' 个目标');
+        }catch(e){message('识别失败：'+e.message,true);state.textContent='● 检测异常';}
+      }
+      if(id===runId)timer=setTimeout(tick,120);
+    }tick();
+  }
+  video.addEventListener('loadedmetadata',resizeToVideo);
+  video.addEventListener('ended',()=>{clearBoxes();state.textContent='● 视频已结束';message('视频播放结束，点播放按钮可重新开始。');});
+  $('file').addEventListener('change',async e=>{
+    const f=e.target.files?.[0];if(!f)return;stopCurrent();url=URL.createObjectURL(f);source='file';video.src=url;video.muted=true;video.loop=false;video.controls=false;$('sourceLabel').textContent='SOURCE: VIDEO';$('placeholder').style.display='none';$('pause').disabled=false;
+    try{await ensureModel();await video.play();startLoop();}catch(err){message('无法打开或检测视频：'+err.message,true);state.textContent='● 启动失败';}
+    e.target.value='';
+  });
+  $('camera').addEventListener('click',async()=>{
+    stopCurrent();source='camera';$('sourceLabel').textContent='SOURCE: CAMERA';
+    try{if(!navigator.mediaDevices?.getUserMedia)throw new Error('此网页需要 HTTPS 才能访问摄像头');
+      stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;video.muted=true;$('placeholder').style.display='none';await video.play();await ensureModel();startLoop();
+    }catch(err){message('无法启用摄像头：'+err.message+'。请允许摄像头权限，并使用 HTTPS 网站。',true);state.textContent='● 摄像头不可用';if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}}
+  });
+  $('pause').addEventListener('click',async()=>{if(source!=='file')return;if(video.paused){if(video.ended)video.currentTime=0;try{await video.play();state.textContent='● 播放中';}catch(e){message(e.message,true);}}else{video.pause();state.textContent='● 已暂停';}});
+  $('stop').addEventListener('click',()=>{stopCurrent();message('已停止。可重新选择视频或打开摄像头。');});
+  $('full').addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen();}else if(stage.requestFullscreen){await stage.requestFullscreen();}else{message('当前浏览器不支持网页全屏，请横屏观看。',true);}}catch(e){message('无法全屏：'+e.message,true);}});
+  window.addEventListener('pagehide',()=>{if(stream)stream.getTracks().forEach(t=>t.stop());});
+  ensureModel().catch(e=>{message(e.message,true);state.textContent='● 模型未加载';});
+})();
+</script>
+</body>
+</html>
